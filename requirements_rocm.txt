@@ -1,0 +1,32 @@
+# ============================================================
+# Gaussian Color Adjust — installazione ROCm per AMD RX 9070 XT
+# ============================================================
+#
+# STEP 1 — Installa PyTorch con supporto ROCm (Linux)
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm6.1
+#
+# STEP 2 — Verifica che PyTorch veda la GPU AMD
+#   python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+#   (Su ROCm, torch.cuda.is_available() deve restituire True con nome AMD)
+#
+# STEP 3 — Installa gsplat per ROCm
+#   Opzione A (se disponibile su PyPI con supporto ROCm):
+#     pip install gsplat
+#   Opzione B (build da sorgente dal fork ROCm):
+#     pip install git+https://github.com/ROCm/gsplat.git
+#   Opzione C (se la build fallisce): il progetto usa automaticamente
+#     il renderer PyTorch puro, che funziona su ROCm senza compilazione.
+#
+# STEP 4 — Installa il resto delle dipendenze
+#   pip install -r requirements.txt --no-deps
+#   pip install numpy Pillow plyfile tqdm diffusers transformers accelerate pycolmap pytest pytest-mock
+#
+# NOTE:
+#   - gsplat su ROCm richiede ROCm >= 6.0 e il compilatore hipcc
+#   - In caso di problemi di build, imposta: ROCM_PATH=/opt/rocm
+#   - Per abilitare il fallback PyTorch puro senza gsplat:
+#       python -c "from utils.renderer import get_renderer; r,n = get_renderer(); print(n)"
+# ============================================================
+
+# Le dipendenze ROCm PyTorch vanno installate PRIMA con il comando sopra.
+# Questo file documenta le istruzioni; non eseguirlo direttamente con pip.
