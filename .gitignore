@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Ambienti virtuali
+.venv/
+venv/
+env/
+
+# Build / installazione
+*.egg-info/
+dist/
+build/
+
+# Dati e output (pesanti, non versionare)
+data/
+renders/
+
+# Editor
+.vscode/
+.idea/
+*.swp
