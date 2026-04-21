@@ -134,11 +134,11 @@ def _parser_edit(sub: argparse._SubParsersAction) -> None:
         ),
     )
     p.add_argument(
-        "--max_size", type=int, default=512, metavar="N",
+        "--max_size", type=int, default=None, metavar="N",
         help=(
-            "Lato massimo in pixel dell'immagine passata al modello. "
-            "Il modello è addestrato a 512px; valori più alti aumentano la VRAM "
-            "senza migliorare la qualità (default: %(default)s)"
+            "Se impostato, ridimensiona il lato maggiore a N pixel prima di "
+            "passare l'immagine al modello (multiplo di 8, es. 512 o 768). "
+            "Utile per limitare VRAM su GPU piccole (default: nessun resize)"
         ),
     )
     p.add_argument(

@@ -69,7 +69,14 @@ class ImageEditor:
             torch_dtype=dtype,
             safety_checker=None,
         )
-        self.pipe = self.pipe.to(self.device)
+        # Su ROCm float32 occupa ~12 GB lasciando poca VRAM libera; il CPU offload
+        # tiene il modello in RAM e sposta i layer su GPU uno alla volta, riducendo
+        # drasticamente il picco di VRAM senza dover ridimensionare le immagini.
+        if is_rocm:
+            self.pipe.enable_model_cpu_offload()
+            logger.info("CPU offload abilitato (ROCm)")
+        else:
+            self.pipe = self.pipe.to(self.device)
         self.pipe.set_progress_bar_config(disable=True)
         logger.info("Modello caricato correttamente")
 
@@ -80,7 +87,7 @@ class ImageEditor:
         num_steps: int = 20,
         image_guidance_scale: float = 1.5,
         guidance_scale: float = 7.5,
-        max_size: int = 512,
+        max_size: int | None = None,
     ) -> Any:
         """Applica una modifica all'immagine in base al prompt testuale.
 
@@ -90,20 +97,20 @@ class ImageEditor:
             num_steps: passi di denoising (più passi → qualità maggiore, più lento).
             image_guidance_scale: forza dell'ancoraggio all'immagine originale.
             guidance_scale: forza del seguire il prompt testuale (CFG scale).
-            max_size: lato massimo in pixel prima di passare al modello (default: 512).
-                      Ridimensiona mantenendo le proporzioni; deve essere multiplo di 8.
+            max_size: se impostato, ridimensiona l'immagine in modo che il lato
+                      maggiore sia al massimo ``max_size`` pixel (multiplo di 8).
+                      Utile per limitare VRAM su GPU piccole.
 
         Returns:
-            ``PIL.Image.Image``: immagine modificata, ridimensionata a max_size.
+            ``PIL.Image.Image``: immagine modificata.
         """
-        # InstructPix2Pix è addestrato a 512px; immagini più grandi
-        # consumano VRAM in modo quadratico senza migliorare la qualità.
-        w, h = image.size
-        if max(w, h) > max_size:
-            scale = max_size / max(w, h)
-            new_w = (int(w * scale) // 8) * 8
-            new_h = (int(h * scale) // 8) * 8
-            image = image.resize((new_w, new_h), resample=3)  # BICUBIC
+        if max_size is not None:
+            w, h = image.size
+            if max(w, h) > max_size:
+                scale = max_size / max(w, h)
+                new_w = (int(w * scale) // 8) * 8
+                new_h = (int(h * scale) // 8) * 8
+                image = image.resize((new_w, new_h), resample=3)  # BICUBIC
 
         logger.debug("Editing immagine %dx%d con prompt: '%s'", image.width, image.height, prompt)
         result = self.pipe(
@@ -170,7 +177,3 @@ class ImageEditor:
                 logger.debug("Salvata: %s", out_path.name)
             except Exception as exc:
                 logger.error("Errore su %s: %s", img_path.name, exc)
-            finally:
-                # Libera la memoria GPU frammentata dopo ogni immagine
-                if self._torch.cuda.is_available():
-                    self._torch.cuda.empty_cache()
