@@ -6,8 +6,10 @@ un'immagine originale e un testo di istruzione e restituisce l'immagine
 modificata secondo il prompt (es. "rendi le foglie autunnali").
 
 Gestione del dtype:
-  - CUDA / MPS → float16  (risparmio memoria)
-  - CPU        → float32
+  - CUDA NVIDIA → float16  (risparmio memoria)
+  - CUDA ROCm   → float32  (float16 causa GPU page fault con diffusers su AMD)
+  - MPS         → float16
+  - CPU         → float32
 """
 
 from __future__ import annotations
@@ -54,7 +56,10 @@ class ImageEditor:
         self.device = device if device is not None else get_device()
         self.model_id = model_id
 
-        dtype = torch.float16 if self.device.type in ("cuda", "mps") else torch.float32
+        # ROCm espone la GPU come "cuda" ma float16 causa GPU page fault con diffusers;
+        # si distingue dal vero CUDA controllando il nome del device.
+        is_rocm = self.device.type == "cuda" and "amd" in torch.cuda.get_device_name(self.device).lower()
+        dtype = torch.float32 if (is_rocm or self.device.type == "cpu") else torch.float16
         logger.info(
             "Caricamento modello %s su %s (dtype=%s)",
             model_id, self.device, dtype,
@@ -65,10 +70,6 @@ class ImageEditor:
             safety_checker=None,
         )
         self.pipe = self.pipe.to(self.device)
-        # Riduce il picco di VRAM elaborando l'attenzione a slice
-        self.pipe.enable_attention_slicing()
-        if hasattr(self.pipe, "enable_vae_slicing"):
-            self.pipe.enable_vae_slicing()
         self.pipe.set_progress_bar_config(disable=True)
         logger.info("Modello caricato correttamente")
 
@@ -79,6 +80,7 @@ class ImageEditor:
         num_steps: int = 20,
         image_guidance_scale: float = 1.5,
         guidance_scale: float = 7.5,
+        max_size: int = 512,
     ) -> Any:
         """Applica una modifica all'immagine in base al prompt testuale.
 
@@ -88,11 +90,22 @@ class ImageEditor:
             num_steps: passi di denoising (più passi → qualità maggiore, più lento).
             image_guidance_scale: forza dell'ancoraggio all'immagine originale.
             guidance_scale: forza del seguire il prompt testuale (CFG scale).
+            max_size: lato massimo in pixel prima di passare al modello (default: 512).
+                      Ridimensiona mantenendo le proporzioni; deve essere multiplo di 8.
 
         Returns:
-            ``PIL.Image.Image``: immagine modificata.
+            ``PIL.Image.Image``: immagine modificata, ridimensionata a max_size.
         """
-        logger.debug("Editing immagine con prompt: '%s'", prompt)
+        # InstructPix2Pix è addestrato a 512px; immagini più grandi
+        # consumano VRAM in modo quadratico senza migliorare la qualità.
+        w, h = image.size
+        if max(w, h) > max_size:
+            scale = max_size / max(w, h)
+            new_w = (int(w * scale) // 8) * 8
+            new_h = (int(h * scale) // 8) * 8
+            image = image.resize((new_w, new_h), resample=3)  # BICUBIC
+
+        logger.debug("Editing immagine %dx%d con prompt: '%s'", image.width, image.height, prompt)
         result = self.pipe(
             prompt=prompt,
             image=image,
@@ -153,7 +166,7 @@ class ImageEditor:
             try:
                 pil_img = Image.open(img_path).convert("RGB")
                 edited = self.edit_image(pil_img, prompt, **kwargs)
-                edited.save(out_path)
+                edited.save(out_path, quality=95)
                 logger.debug("Salvata: %s", out_path.name)
             except Exception as exc:
                 logger.error("Errore su %s: %s", img_path.name, exc)

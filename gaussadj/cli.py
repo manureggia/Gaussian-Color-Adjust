@@ -134,6 +134,14 @@ def _parser_edit(sub: argparse._SubParsersAction) -> None:
         ),
     )
     p.add_argument(
+        "--max_size", type=int, default=512, metavar="N",
+        help=(
+            "Lato massimo in pixel dell'immagine passata al modello. "
+            "Il modello è addestrato a 512px; valori più alti aumentano la VRAM "
+            "senza migliorare la qualità (default: %(default)s)"
+        ),
+    )
+    p.add_argument(
         "--no_skip_existing", action="store_true",
         help="Rielabora le immagini già presenti in output_dir (default: salta)",
     )
@@ -165,6 +173,7 @@ def _run_edit(args: argparse.Namespace) -> None:
         num_steps=args.num_steps,
         guidance_scale=args.guidance_scale,
         image_guidance_scale=args.image_guidance_scale,
+        max_size=args.max_size,
         skip_existing=not args.no_skip_existing,
     )
     logger.info("Editing completato. Output in: %s", args.output_dir)
