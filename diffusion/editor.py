@@ -40,6 +40,7 @@ class ImageEditor:
         self,
         model_id: str = "timbrooks/instruct-pix2pix",
         device: Any | None = None,
+        cpu_offload: bool = False,
     ) -> None:
         try:
             import torch
@@ -69,12 +70,12 @@ class ImageEditor:
             torch_dtype=dtype,
             safety_checker=None,
         )
-        # Su ROCm float32 occupa ~12 GB lasciando poca VRAM libera; il CPU offload
-        # tiene il modello in RAM e sposta i layer su GPU uno alla volta, riducendo
-        # drasticamente il picco di VRAM senza dover ridimensionare le immagini.
-        if is_rocm:
+        # Il CPU offload tiene il modello in RAM e sposta i layer su GPU uno alla volta:
+        # riduce drasticamente il picco di VRAM ma rallenta molto l'inferenza.
+        # Da usare solo se l'immagine full-res non entra in VRAM nemmeno resize.
+        if cpu_offload:
             self.pipe.enable_model_cpu_offload()
-            logger.info("CPU offload abilitato (ROCm)")
+            logger.info("CPU offload abilitato (modello in RAM, più lento)")
         else:
             self.pipe = self.pipe.to(self.device)
         self.pipe.set_progress_bar_config(disable=True)

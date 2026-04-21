@@ -142,6 +142,14 @@ def _parser_edit(sub: argparse._SubParsersAction) -> None:
         ),
     )
     p.add_argument(
+        "--cpu_offload", action="store_true",
+        help=(
+            "Abilita CPU offload: tiene il modello in RAM e sposta i layer su "
+            "GPU uno alla volta. Riduce drasticamente la VRAM ma rallenta molto. "
+            "Da usare solo se full-res non entra in VRAM nemmeno con --max_size."
+        ),
+    )
+    p.add_argument(
         "--no_skip_existing", action="store_true",
         help="Rielabora le immagini già presenti in output_dir (default: salta)",
     )
@@ -160,7 +168,7 @@ def _run_edit(args: argparse.Namespace) -> None:
     logger.info("Device: %s", get_device_name())
 
     logger.info("Caricamento modello di diffusione '%s'...", args.model_id)
-    editor = ImageEditor(model_id=args.model_id, device=device)
+    editor = ImageEditor(model_id=args.model_id, device=device, cpu_offload=args.cpu_offload)
 
     logger.info(
         "Editing: input=%s  output=%s  prompt='%s'",

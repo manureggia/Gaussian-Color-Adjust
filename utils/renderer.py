@@ -143,8 +143,10 @@ def _render_with_gsplat(
     opacities = torch.sigmoid(opacity_logit).squeeze(-1)    # (N,)
     quats = F.normalize(rotation, dim=-1)                   # (N,4)
 
-    # Colori grado 0: sigmoid dei coefficienti DC
-    sh_colors = torch.sigmoid(features_dc).squeeze(1)       # (N,3)
+    # Coefficienti SH grado 0: gsplat li valuta internamente quando sh_degree è
+    # passato, quindi NON applichiamo sigmoid qui. La shape deve essere
+    # (N, K, 3) con K = (sh_degree+1)^2 = 1.
+    sh_coeffs = features_dc                                  # (N,1,3)
 
     viewmat = camera_to_viewmat(camera, device=device)   # (1,4,4)
     K = camera_to_K(camera, device=device)              # (1,3,3)
@@ -154,7 +156,7 @@ def _render_with_gsplat(
         quats=quats,
         scales=scales,
         opacities=opacities,
-        colors=sh_colors,
+        colors=sh_coeffs,
         viewmats=viewmat,
         Ks=K,
         width=W,

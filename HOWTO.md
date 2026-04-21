@@ -160,7 +160,7 @@ unzip 360_v2.zip -d data/
 
 ```
 data/garden/
-├── input/
+├── images/
 │   ├── IMG_0001.JPG
 │   ├── IMG_0002.JPG
 │   └── ...
@@ -205,10 +205,11 @@ essere di una versione COLMAP non supportata (raro con versioni >= 3.x).
 
 ```bash
 gaussadj edit \
-    --input_dir  data/garden/input \
-    --output_dir data/garden/input_edited \
-    --prompt "TESTO_DEL_PROMPT" \
-    --num_steps 25
+      --input_dir  data/garden/images \
+      --output_dir data/garden/input_edited \
+      --prompt "make it look like autumn with orange and red leaves falling" \
+      --num_steps 25
+      --max_size 512
 ```
 
 ### Esempi di prompt
