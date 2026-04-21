@@ -6,10 +6,8 @@ un'immagine originale e un testo di istruzione e restituisce l'immagine
 modificata secondo il prompt (es. "rendi le foglie autunnali").
 
 Gestione del dtype:
-  - CUDA NVIDIA → float16  (risparmio memoria)
-  - CUDA ROCm   → float32  (float16 causa memory fault su AMD)
-  - MPS         → float16
-  - CPU         → float32
+  - CUDA / MPS → float16  (risparmio memoria)
+  - CPU        → float32
 """
 
 from __future__ import annotations
@@ -56,10 +54,7 @@ class ImageEditor:
         self.device = device if device is not None else get_device()
         self.model_id = model_id
 
-        # ROCm espone la GPU come "cuda" ma float16 causa memory fault su AMD;
-        # si distingue dal vero CUDA controllando la stringa del device name.
-        is_rocm = self.device.type == "cuda" and "amd" in torch.cuda.get_device_name(self.device).lower()
-        dtype = torch.float32 if (is_rocm or self.device.type == "cpu") else torch.float16
+        dtype = torch.float16 if self.device.type in ("cuda", "mps") else torch.float32
         logger.info(
             "Caricamento modello %s su %s (dtype=%s)",
             model_id, self.device, dtype,
@@ -158,3 +153,7 @@ class ImageEditor:
                 logger.debug("Salvata: %s", out_path.name)
             except Exception as exc:
                 logger.error("Errore su %s: %s", img_path.name, exc)
+            finally:
+                # Libera la memoria GPU frammentata dopo ogni immagine
+                if self._torch.cuda.is_available():
+                    self._torch.cuda.empty_cache()
