@@ -289,8 +289,22 @@ def _run_fit(args: argparse.Namespace) -> None:
     cameras = []
     for cam in raw_cameras:
         c = dict(cam)
-        c["R"] = torch.tensor(cam["R"], dtype=torch.float32)
-        c["T"] = torch.tensor(cam["T"], dtype=torch.float32)
+        # Formato Inria (gaussian-splatting originale): rotation=R_c2w, position=centro camera mondo,
+        # img_name invece di image_name, nessun cx/cy (principal point al centro).
+        if "R" not in cam and "rotation" in cam:
+            import numpy as _np
+            rot_c2w = _np.array(cam["rotation"], dtype=_np.float32)
+            pos_world = _np.array(cam["position"], dtype=_np.float32)
+            R_w2c = rot_c2w.T
+            T_w2c = -R_w2c @ pos_world
+            c["R"] = torch.tensor(R_w2c, dtype=torch.float32)
+            c["T"] = torch.tensor(T_w2c, dtype=torch.float32)
+            c.setdefault("image_name", cam.get("img_name", ""))
+            c.setdefault("cx", cam["width"] / 2.0)
+            c.setdefault("cy", cam["height"] / 2.0)
+        else:
+            c["R"] = torch.tensor(cam["R"], dtype=torch.float32)
+            c["T"] = torch.tensor(cam["T"], dtype=torch.float32)
         cameras.append(c)
     logger.info("Caricate %d camera da %s", len(cameras), args.cameras_json)
 
