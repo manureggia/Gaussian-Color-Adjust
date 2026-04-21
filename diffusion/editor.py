@@ -65,6 +65,10 @@ class ImageEditor:
             safety_checker=None,
         )
         self.pipe = self.pipe.to(self.device)
+        # Riduce il picco di VRAM elaborando l'attenzione a slice
+        self.pipe.enable_attention_slicing()
+        if hasattr(self.pipe, "enable_vae_slicing"):
+            self.pipe.enable_vae_slicing()
         self.pipe.set_progress_bar_config(disable=True)
         logger.info("Modello caricato correttamente")
 
