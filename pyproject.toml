@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "gaussian-color-adjust"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = []   # usa requirements.txt per le dipendenze heavy
+
+[project.scripts]
+gaussadj = "gaussadj.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["gaussadj*", "diffusion*", "training*", "utils*"]

@@ -26,8 +26,9 @@ source .venv/bin/activate
 # PyTorch con supporto MPS (incluso nel wheel standard da PyTorch 2.0+)
 pip install torch torchvision
 
-# Installa le dipendenze del progetto
+# Installa le dipendenze del progetto e registra il comando gaussadj
 pip install -r requirements.txt
+pip install -e .
 
 # gsplat viene installato ma non funzionerà senza kernel CUDA:
 # il progetto usa automaticamente il renderer PyTorch puro su MPS.
@@ -62,8 +63,9 @@ pip install git+https://github.com/ROCm/gsplat.git
 # Opzione C: senza gsplat (usa il renderer PyTorch puro)
 # Non installare nulla — il fallback è automatico
 
-# STEP 3: Installa le dipendenze rimanenti
+# STEP 3: Installa le dipendenze rimanenti e registra il comando gaussadj
 pip install diffusers transformers accelerate Pillow numpy plyfile tqdm pytest pytest-mock pycolmap
+pip install -e .
 ```
 
 ### 1c. PC con NVIDIA GPU — CUDA
@@ -75,8 +77,9 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 # Installa gsplat (si compila automaticamente con CUDA)
 pip install gsplat
 
-# Installa il resto
+# Installa il resto e registra il comando gaussadj
 pip install -r requirements.txt
+pip install -e .
 ```
 
 ### Struttura directory di lavoro
@@ -136,13 +139,17 @@ print('Renderer attivo:', get_active_backend())
 Il sito ufficiale del progetto 3DGS mette a disposizione scene pre-ricostruite:
 
 ```bash
-# Scene disponibili: garden, bicycle, bonsai, counter, kitchen, room, stump, treehill
 
-# Scarica con wget (esempio per 'garden')
-wget https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/garden.zip
-unzip garden.zip -d data/
+# Dataset parte 1 — contiene: garden, bicycle, bonsai, counter, kitchen, room, stump
+wget http://storage.googleapis.com/gresearch/refraw360/360_v2.zip
 
-# Struttura risultante:
+# Dataset parte 2 — contiene scene extra
+# wget https://storage.googleapis.com/gresearch/refraw360/360_extra_scenes.zip
+
+# Estrai
+unzip 360_v2.zip -d data/
+
+# Esempio struttura risultante:
 # data/garden/
 #   input/          ← immagini originali (JPEG)
 #   sparse/0/       ← ricostruzione COLMAP (cameras.bin, images.bin, points3D.bin)
@@ -172,23 +179,7 @@ data/garden/
 Le pose camera COLMAP devono essere convertite nel formato JSON del progetto:
 
 ```bash
-python -c "
-from utils.cameras_from_colmap import convert_colmap_to_json
-convert_colmap_to_json(
-    colmap_sparse_dir='data/garden/sparse/0',
-    output_json='data/garden/cameras.json',
-)
-print('Conversione completata!')
-"
-```
-
-**oppure** direttamente da script:
-```bash
-python -c "
-import sys; sys.path.insert(0, '.')
-from utils.cameras_from_colmap import convert_colmap_to_json
-convert_colmap_to_json('data/garden/sparse/0', 'data/garden/cameras.json')
-"
+gaussadj colmap data/garden/sparse/0 data/garden/cameras.json
 ```
 
 **Verifica del file generato**:
@@ -213,8 +204,8 @@ essere di una versione COLMAP non supportata (raro con versioni >= 3.x).
 ### Sintassi base
 
 ```bash
-python scripts/edit_images.py \
-    --input_dir data/garden/input \
+gaussadj edit \
+    --input_dir  data/garden/input \
     --output_dir data/garden/input_edited \
     --prompt "TESTO_DEL_PROMPT" \
     --num_steps 25
@@ -224,8 +215,8 @@ python scripts/edit_images.py \
 
 **Effetto autunno** (foglie arancioni e rosse):
 ```bash
-python scripts/edit_images.py \
-    --input_dir data/garden/input \
+gaussadj edit \
+    --input_dir  data/garden/input \
     --output_dir data/garden/input_autumn \
     --prompt "make it look like autumn with orange and red leaves falling" \
     --num_steps 30 \
@@ -235,8 +226,8 @@ python scripts/edit_images.py \
 
 **Tramonto dorato**:
 ```bash
-python scripts/edit_images.py \
-    --input_dir data/garden/input \
+gaussadj edit \
+    --input_dir  data/garden/input \
     --output_dir data/garden/input_sunset \
     --prompt "make it a golden hour sunset with warm orange and pink sky" \
     --num_steps 25 \
@@ -245,8 +236,8 @@ python scripts/edit_images.py \
 
 **Effetto invernale / neve**:
 ```bash
-python scripts/edit_images.py \
-    --input_dir data/garden/input \
+gaussadj edit \
+    --input_dir  data/garden/input \
     --output_dir data/garden/input_winter \
     --prompt "make it look like winter with snow covering the ground and plants" \
     --num_steps 30 \
@@ -255,8 +246,8 @@ python scripts/edit_images.py \
 
 **Stile notturno**:
 ```bash
-python scripts/edit_images.py \
-    --input_dir data/garden/input \
+gaussadj edit \
+    --input_dir  data/garden/input \
     --output_dir data/garden/input_night \
     --prompt "change to nighttime with moonlight and artificial lights" \
     --num_steps 35 \
@@ -265,8 +256,8 @@ python scripts/edit_images.py \
 
 **Effetto nebbia / mattino**:
 ```bash
-python scripts/edit_images.py \
-    --input_dir data/garden/input \
+gaussadj edit \
+    --input_dir  data/garden/input \
     --output_dir data/garden/input_foggy \
     --prompt "add morning fog and mist to the scene" \
     --num_steps 20 \
@@ -281,6 +272,7 @@ python scripts/edit_images.py \
 - Le immagini già presenti in `output_dir` vengono saltate automaticamente
   (riprendi da dove eri arrivato se interrotto). Usa `--no_skip_existing`
   per forzare la rielaborazione.
+- Per vedere tutti i parametri disponibili: `gaussadj edit --help`
 
 ---
 
@@ -289,11 +281,11 @@ python scripts/edit_images.py \
 ### Comando base
 
 ```bash
-python scripts/fit_colors.py \
-    --ply data/garden/point_cloud/iteration_7000/point_cloud.ply \
-    --images_dir data/garden/input_autumn \
+gaussadj fit \
+    --ply          data/garden/point_cloud/iteration_7000/point_cloud.ply \
+    --images_dir   data/garden/input_autumn \
     --cameras_json data/garden/cameras.json \
-    --output_ply data/garden/point_cloud_autumn.ply \
+    --output_ply   data/garden/point_cloud_autumn.ply \
     --num_iterations 2000 \
     --log_every 100
 ```
@@ -325,11 +317,11 @@ automaticamente in `checkpoint_interrupt.ply`.
 
 ```bash
 # Fitting aggressivo (più iterazioni, LR più alto)
-python scripts/fit_colors.py \
-    --ply data/garden/point_cloud/iteration_7000/point_cloud.ply \
-    --images_dir data/garden/input_autumn \
+gaussadj fit \
+    --ply          data/garden/point_cloud/iteration_7000/point_cloud.ply \
+    --images_dir   data/garden/input_autumn \
     --cameras_json data/garden/cameras.json \
-    --output_ply data/garden/point_cloud_autumn.ply \
+    --output_ply   data/garden/point_cloud_autumn.ply \
     --num_iterations 5000 \
     --lr_dc 0.008 \
     --lr_rest 0.002 \
@@ -344,21 +336,21 @@ python scripts/fit_colors.py \
 ### Renderizza la scena originale
 
 ```bash
-python scripts/render_scene.py \
-    --ply data/garden/point_cloud/iteration_7000/point_cloud.ply \
+gaussadj render \
+    --ply          data/garden/point_cloud/iteration_7000/point_cloud.ply \
     --cameras_json data/garden/cameras.json \
-    --camera_id 0 \
-    --output renders/before.png
+    --camera_id    0 \
+    --output       renders/before.png
 ```
 
 ### Renderizza la scena editata
 
 ```bash
-python scripts/render_scene.py \
-    --ply data/garden/point_cloud_autumn.ply \
+gaussadj render \
+    --ply          data/garden/point_cloud_autumn.ply \
     --cameras_json data/garden/cameras.json \
-    --camera_id 0 \
-    --output renders/after.png
+    --camera_id    0 \
+    --output       renders/after.png
 ```
 
 ### Confronto before/after in Python
@@ -383,11 +375,11 @@ print("Confronto salvato in renders/comparison.png")
 
 ```bash
 for i in $(seq 0 9); do
-    python scripts/render_scene.py \
-        --ply data/garden/point_cloud_autumn.ply \
+    gaussadj render \
+        --ply          data/garden/point_cloud_autumn.ply \
         --cameras_json data/garden/cameras.json \
-        --camera_id $i \
-        --output renders/frame_$(printf "%03d" $i).png
+        --camera_id    $i \
+        --output       renders/frame_$(printf "%03d" $i).png
 done
 ```
 
@@ -420,7 +412,7 @@ print('Backend:', get_active_backend())  # → 'pure_pytorch'
 **Soluzioni**:
 ```bash
 # 1. Riduci i passi di denoising
-python scripts/edit_images.py ... --num_steps 10
+gaussadj edit ... --num_steps 10
 
 # 2. Abilita il garbage collection MPS tra immagini (aggiungi al codice o via env)
 export PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0
@@ -460,7 +452,7 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm6
 lanci script in modo non standard:
 ```bash
 export PYTORCH_ENABLE_MPS_FALLBACK=1
-python scripts/fit_colors.py ...
+gaussadj fit ...
 ```
 
 ---
@@ -506,40 +498,49 @@ export FORCE_PURE_PYTORCH=1   # (se implementi questa env var)
 
 ## 9. Tabella parametri CLI
 
-### `scripts/edit_images.py`
+Per l'help completo di ogni sottocomando: `gaussadj <comando> --help`
 
-| Parametro                | Tipo    | Default                         | Descrizione                            |
-|--------------------------|---------|---------------------------------|----------------------------------------|
-| `--input_dir`            | Path    | **obbligatorio**                | Cartella immagini originali            |
-| `--output_dir`           | Path    | **obbligatorio**                | Cartella immagini editate (output)     |
-| `--prompt`               | str     | **obbligatorio**                | Istruzione di modifica                 |
-| `--model_id`             | str     | `timbrooks/instruct-pix2pix`    | Identificatore HuggingFace modello     |
-| `--num_steps`            | int     | `20`                            | Passi di denoising                     |
-| `--guidance_scale`       | float   | `7.5`                           | Intensità del prompt testuale          |
-| `--image_guidance_scale` | float   | `1.5`                           | Ancoraggio all'immagine originale      |
-| `--no_skip_existing`     | flag    | `False`                         | Se presente, rielabora file esistenti  |
+### `gaussadj colmap`
 
-### `scripts/fit_colors.py`
+| Argomento      | Tipo | Descrizione                                              |
+|----------------|------|----------------------------------------------------------|
+| `SPARSE_DIR`   | Path | Cartella COLMAP sparse con `cameras.bin` e `images.bin`  |
+| `OUTPUT_JSON`  | Path | File `cameras.json` da creare                            |
 
-| Parametro           | Tipo    | Default          | Descrizione                                    |
-|---------------------|---------|------------------|------------------------------------------------|
-| `--ply`             | Path    | **obbligatorio** | File .ply delle gaussiane originali            |
-| `--images_dir`      | Path    | **obbligatorio** | Cartella immagini editate                      |
-| `--cameras_json`    | Path    | **obbligatorio** | File cameras.json con le pose                  |
-| `--output_ply`      | Path    | **obbligatorio** | File .ply output con colori aggiornati         |
-| `--num_iterations`  | int     | `2000`           | Numero di iterazioni di ottimizzazione         |
-| `--lr_dc`           | float   | `0.005`          | Learning rate per features_dc (grado 0)        |
-| `--lr_rest`         | float   | `0.001`          | Learning rate per features_rest (gradi 1-3)    |
-| `--lambda_dssim`    | float   | `0.2`            | Peso della loss SSIM (0=solo L1, 1=solo SSIM)  |
-| `--log_every`       | int     | `100`            | Frequenza di stampa dei log                    |
+### `gaussadj edit`
 
-### `scripts/render_scene.py`
+| Parametro                | Tipo  | Default                      | Descrizione                           |
+|--------------------------|-------|------------------------------|---------------------------------------|
+| `--input_dir`            | Path  | **obbligatorio**             | Cartella immagini originali           |
+| `--output_dir`           | Path  | **obbligatorio**             | Cartella immagini editate (output)    |
+| `--prompt`               | str   | **obbligatorio**             | Istruzione di modifica                |
+| `--model_id`             | str   | `timbrooks/instruct-pix2pix` | Identificatore HuggingFace modello    |
+| `--num_steps`            | int   | `20`                         | Passi di denoising                    |
+| `--guidance_scale`       | float | `7.5`                        | Intensità del prompt testuale         |
+| `--image_guidance_scale` | float | `1.5`                        | Ancoraggio all'immagine originale     |
+| `--no_skip_existing`     | flag  | `False`                      | Se presente, rielabora file esistenti |
 
-| Parametro         | Tipo    | Default          | Descrizione                                  |
-|-------------------|---------|------------------|----------------------------------------------|
-| `--ply`           | Path    | **obbligatorio** | File .ply delle gaussiane                    |
-| `--cameras_json`  | Path    | **obbligatorio** | File cameras.json                            |
-| `--camera_id`     | int     | `0`              | Indice della camera (0-based)                |
-| `--output`        | Path    | **obbligatorio** | File PNG di output                           |
-| `--width`         | int     | dalla camera     | Override larghezza immagine                  |
-| `--height`        | int     | dalla camera     | Override altezza immagine                    |
+### `gaussadj fit`
+
+| Parametro           | Tipo  | Default          | Descrizione                                   |
+|---------------------|-------|------------------|-----------------------------------------------|
+| `--ply`             | Path  | **obbligatorio** | File .ply delle gaussiane originali           |
+| `--images_dir`      | Path  | **obbligatorio** | Cartella immagini editate                     |
+| `--cameras_json`    | Path  | **obbligatorio** | File cameras.json con le pose                 |
+| `--output_ply`      | Path  | **obbligatorio** | File .ply output con colori aggiornati        |
+| `--num_iterations`  | int   | `2000`           | Numero di iterazioni di ottimizzazione        |
+| `--lr_dc`           | float | `0.005`          | Learning rate per features_dc (grado 0)       |
+| `--lr_rest`         | float | `0.001`          | Learning rate per features_rest (gradi 1–3)   |
+| `--lambda_dssim`    | float | `0.2`            | Peso della loss SSIM (0=solo L1, 1=solo SSIM) |
+| `--log_every`       | int   | `100`            | Frequenza di stampa dei log                   |
+
+### `gaussadj render`
+
+| Parametro        | Tipo | Default          | Descrizione                   |
+|------------------|------|------------------|-------------------------------|
+| `--ply`          | Path | **obbligatorio** | File .ply delle gaussiane     |
+| `--cameras_json` | Path | **obbligatorio** | File cameras.json             |
+| `--camera_id`    | int  | `0`              | Indice della camera (0-based) |
+| `--output`       | Path | **obbligatorio** | File PNG di output            |
+| `--width`        | int  | dalla camera     | Override larghezza immagine   |
+| `--height`       | int  | dalla camera     | Override altezza immagine     |
