@@ -211,8 +211,9 @@ def _convert_pycolmap(cameras_raw, images_raw, output_json: Path) -> None:
             R = img.rotation_matrix()
             T = np.array(img.tvec, dtype=np.float64)
         else:
-            R = img.cam_from_world.rotation.matrix()
-            T = np.array(img.cam_from_world.translation, dtype=np.float64)
+            cam_from_world = img.cam_from_world()
+            R = cam_from_world.rotation.matrix()
+            T = np.array(cam_from_world.translation, dtype=np.float64)
         params = cam.params
         model = cam.model.name
         if "PINHOLE" in model and "SIMPLE" not in model:
